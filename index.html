@@ -60,7 +60,7 @@ function onMapClick(e) {
         var res = d_azimut (φλ0, φλ1);
 
         L.popup().setLatLng(e.latlng)
-			.setContent("≈" + res.Δl_m + " м, ∡ ≈" + res.α + " \nНаправление: " + geo_α (res.α))
+			.setContent("≈" + res.Δl_m + " м, ∡ ≈" + res.α + " </br>Направление: " + geo_α (res.α))
 			.openOn(map);
     }
 }
@@ -69,7 +69,7 @@ function onMarkerClick(e) {
         iniclick = true;
         φλ1 = null;
         L.popup().setLatLng({lat: φλ0[0], lng: φλ0[1]})
-			.setContent(" Не выбрано направление, установаливается в другом месте")
+			.setContent(" Не выбрано направление, устанавливается в другом месте")
 			.openOn(map);    
 }
 
