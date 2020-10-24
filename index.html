@@ -57,7 +57,7 @@ function onMapClick(e) {
         coordline = L.polyline([
             φλ0,  φλ1
         ], {color: '#FF0000', width: 1}).addTo(map);
-        var res = d_azimut (φλ0, φλ1);
+        var res = Δl_azimut (φλ0, φλ1);
 
         L.popup().setLatLng(e.latlng)
 			.setContent("≈" + res.Δl_m + " м, ∡ ≈" + res.α + "° </br>Направление: " + geo_α (res.α))
@@ -94,7 +94,7 @@ function geo_α (α)
         return "С";
 }
 
-function d_azimut (φλ0, φλ1) {
+function Δl_azimut (φλ0, φλ1) {
     function rad (x)
         { return x * Math.PI/180; }
     var φ1 = rad (φλ0[0]); var λ1 = rad (φλ0[1]);
