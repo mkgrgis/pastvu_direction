@@ -60,7 +60,7 @@ function onMapClick(e) {
         var res = d_azimut (φλ0, φλ1);
 
         L.popup().setLatLng(e.latlng)
-			.setContent("≈" + res.Δl_m + " м, ∡ ≈" + res.α + " </br>Направление: " + geo_α (res.α))
+			.setContent("≈" + res.Δl_m + " м, ∡ ≈" + res.α + "° </br>Направление: " + geo_α (res.α))
 			.openOn(map);
     }
 }
@@ -114,7 +114,7 @@ function d_azimut (φλ0, φλ1) {
     var x = Math.cos(φ1)*Math.sin(φ2) -
           Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
     var θ = Math.atan2(y, x);
-    var α = (θ*180/Math.PI + 360) % 360; // in degrees
+    var α = (θ*180/Math.PI + 360) % 360; // °
     return {
         Δl_m: Δl_m.toFixed(2),
         α:α.toFixed(3)
