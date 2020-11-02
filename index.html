@@ -6,6 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+    <script src="leaflet.sector.js"></script>
 	<style>
 		html, body {
 			height: 100%;
@@ -32,66 +33,54 @@
             attribution: 'google'
         })
     }).addTo(map);
-   
 
-var iniclick = true;
-var φλ0, φλ1;
-var coordline;
-var ini_marker;
+    var obj = {};   
+// В функцию создания
+// function create () { 
+    obj.iniclick = true; // Флаг выбранной точки фотографа/худолжника
+    obj.φλ0 = null; // Координаты фотографа/худоджника
+    obj.φλ1 = null; // Координаты объекта по центру изображения
+    obj.racursmark = null; // Отметка ракурса L.layerGroup
+    obj.ini_marker = null; // Отметка начальной точки L.layer
+    obj.dir = ['n', 'n', 'ne', 'ne', 'ne', 'ne', 'e', 'e', 'e', 'e', 'se', 'se', 'se', 'se', 's', 's', 's', 's', 'sw', 'sw', 'sw', 'sw', 'w', 'w', 'w', 'w', 'nw', 'nw', 'nw', 'nw', 'n', 'n' ]; // Индексы сторон света по долям в 11,25°
+
+// }
 
 function onMapClick(e) {
-    var φλ = [e.latlng.lat, e.latlng.lng];
-    if (iniclick){
-        φλ0 = φλ;
-        iniclick = false;
-        if (coordline)
-            map.removeLayer(coordline);
-        if (ini_marker)
-            map.removeLayer(ini_marker);
-        ini_marker = L.marker(φλ0).bindPopup('Точка изображения').addTo(map);
-        ini_marker.on('click', onMarkerClick);
+    obj.φλ = [e.latlng.lat, e.latlng.lng];
+    if (obj.iniclick){
+        obj.φλ0 = obj.φλ;
+        obj.iniclick = false;
+    if (obj.racursmark)
+        map.removeLayer(obj.racursmark);
+        if (obj.ini_marker)
+            map.removeLayer(obj.ini_marker);
+        obj.ini_marker = L.marker(obj.φλ0).bindPopup('Точка изображения').addTo(map);
+        obj.ini_marker.on('click', onMarkerClick);
 
     } else {
-        iniclick = true;
-        φλ1 = φλ;
-        coordline = L.polyline([
-            φλ0,  φλ1
-        ], {color: '#FF0000', width: 1}).addTo(map);
-        var res = Δl_azimut (φλ0, φλ1);
-
+        obj.iniclick = true;
+        obj.φλ1 = obj.φλ;
+        obj.res = Δl_azimut (obj.φλ0, obj.φλ1);
         L.popup().setLatLng(e.latlng)
-			.setContent("≈" + res.Δl_m + " м, ∡ ≈" + res.α + "° </br>Направление: " + geo_α (res.α))
+			.setContent("≈" + obj.res.Δl_m + " м, ∡ ≈" + obj.res.α + "° </br>Направление: " + geo_α (obj.res.α))
 			.openOn(map);
     }
 }
 
 function onMarkerClick(e) {
+        if (obj.φλ1)
+            return;
         iniclick = true;
-        φλ1 = null;
-        L.popup().setLatLng({lat: φλ0[0], lng: φλ0[1]})
+        obj.φλ1 = null;
+        L.popup().setLatLng({lat: obj.φλ0[0], lng: obj.φλ0[1]})
 			.setContent(" Не выбрано направление, устанавливается в другом месте")
 			.openOn(map);    
 }
 
 function geo_α (α)
 {
-    var x = Math.floor(α/22.5);
-    if (x>=1 && x<3)
-        return "СВ";
-    if (x>=3 && x<5)
-        return "В";
-    if (x>=5 && x<7)
-        return "ЮВ";
-    if (x>=7 && x<9)
-        return "Ю";
-    if (x>=9 && x<11)
-        return "ЮЗ";
-    if (x>=11 && x<13)
-        return "З";
-    if (x>=13 && x<15)
-        return "СЗ";
-    if (x>=15 || x<1)
-        return "С";
+    return obj.dir[Math.floor(α/11.25)];
 }
 
 function Δl_azimut (φλ0, φλ1) {
@@ -122,6 +111,41 @@ function Δl_azimut (φλ0, φλ1) {
 }
 
 map.on('click', onMapClick);
+map.addEventListener('mousemove', (event) => {
+    if (obj.iniclick)
+        return;
+    if (obj.racursmark){
+        map.removeLayer(obj.racursmark);
+        obj.racursmark = null;
+    }
+    var φλ_ = [event.latlng.lat, event.latlng.lng];
+    var pl = L.polyline(
+            [obj.φλ0, φλ_],
+            {color: '#FF0000', weight: 1}
+        );
+    var res = Δl_azimut (obj.φλ0, φλ_);
+    if (res.Δl_m < 0.001)
+        return;
+    var c = {lat:obj.φλ0[0], lng:obj.φλ0[1]};
+    var sc = L.sector({
+                center: c,
+                innerRadius: 0,
+                outerRadius: res.Δl_m,
+                startBearing: Math.floor(Number(res.α) - 22.5),
+                endBearing: Math.floor(Number(res.α) + 22.5),
+                fill: true,
+                fillColor: '#aa0000',
+                fillOpacity: 0.3,
+                color: '#FF0000',
+                opacity: 0.1,
+                weight: 0
+            });
+    obj.racursmark = new L.LayerGroup();
+    obj.racursmark.addLayer(pl);
+    obj.racursmark.addLayer(sc);
+    obj.racursmark.addTo(map);
+});
+
 </script>
 </body>
 </html>
