@@ -47,13 +47,13 @@ Pseudoobj.prototype = { // оболочка псевдокласса
 //		this.dir = ['n', 'nne', 'nee', 'ne', 'ne', 'nee', 'nee', 'e', 'e', 'see', 'see', 'se', 'se', 'sse', 'sse', 's', 's', 'ssw', 'sww', 'sw', 'sw', 'sww', 'sww', 'w', 'w', 'nww', 'nww', 'nw', 'nw', 'nnw', 'nnw', 'n' ]; // Индексы сторон света по долям в 11,25°, на 16 направлений
 	},
 	voidageGeoPiont : function () { // Очистка всех пространственных данных 
-        this.mode == 0;
+	  this.mode == 0;
 	},
 	voidageDirection : function () { // Очистка направления
-        this.mode == 1;
+	  this.mode == 1;
 	},
 	voidageObserveAngle : function () { // Очистка угла обзора
-        this.mode == 2;
+	  this.mode == 2;
 	},
 	onMapGeoSelectionClick: function (e) {
 		this.φλ = [e.latlng.lat, e.latlng.lng];
@@ -135,6 +135,7 @@ Pseudoobj.prototype = { // оболочка псевдокласса
 			L.popup().setLatLng(this.φλ0)
 				.setContent("≈" + Δl_m + " м, ∡ ≈" + α + "° </br>Направление: " + this.geo_α (α))
 				.openOn(map);
+    		this.mode = 0;
 	},
 	geo_α : function (α) { // Латинский индекс направления по значению азимутального угла
 		return α ? this.dir[Math.floor(α/11.25)] : null;
