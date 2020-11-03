@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
-<head>	
+<head>
 	<title>Демонстрация выбора направления</title>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
-    <script src="leaflet.sector.js"></script>
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
+	<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+	<script src="leaflet.sector.js"></script>
 	<style>
 		html, body {
 			height: 100%;
@@ -22,130 +22,155 @@
 
 <div id='map'></div>
 <script>
-    var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            osm = L.tileLayer(osmUrl, { maxZoom: 20, attribution: osmAttrib }),
-            map = new L.Map('map', { center: new L.LatLng( 59.6931881, 30.4437972), zoom: 16 }),
-            drawnItems = L.featureGroup().addTo(map);
-    L.control.layers({
-        'osm': osm.addTo(map),
-        "google": L.tileLayer('http://www.google.cn/maps/vt?lyrs=s@189&gl=cn&x={x}&y={y}&z={z}', {
-            attribution: 'google'
-        })
-    }).addTo(map);
+	var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			osm = L.tileLayer(osmUrl, { maxZoom: 20, attribution: osmAttrib }),
+			map = new L.Map('map', { center: new L.LatLng( 59.6931881, 30.4437972), zoom: 16 }),
+			drawnItems = L.featureGroup().addTo(map);
+	L.control.layers({
+		'osm': osm.addTo(map),
+		"google": L.tileLayer('http://www.google.cn/maps/vt?lyrs=s@189&gl=cn&x={x}&y={y}&z={z}', {
+			attribution: 'google'
+		})
+	}).addTo(map);
 
-    var obj = {};   
-// В функцию создания
-// function create () { 
-    obj.iniclick = true; // Флаг выбранной точки фотографа/худолжника
-    obj.φλ0 = null; // Координаты фотографа/худоджника
-    obj.φλ1 = null; // Координаты объекта по центру изображения
-    obj.racursmark = null; // Отметка ракурса L.layerGroup
-    obj.ini_marker = null; // Отметка начальной точки L.layer
-    obj.dir = ['n', 'n', 'ne', 'ne', 'ne', 'ne', 'e', 'e', 'e', 'e', 'se', 'se', 'se', 'se', 's', 's', 's', 's', 'sw', 'sw', 'sw', 'sw', 'w', 'w', 'w', 'w', 'nw', 'nw', 'nw', 'nw', 'n', 'n' ]; // Индексы сторон света по долям в 11,25°
+function Pseudoobj () {} 
+Pseudoobj.prototype = { // оболочка псевдокласса
 
-// }
+	create: function () {
+		this.mode = 0; // 0 - выбор точки фотографа/худолжника 1 - выбор направления/объекта по центру фото (азимута) 2 - выбор угла обзора 4 - выбор сделан выбранной точки
+		this.φλ0 = null; // Координаты фотографа/худоджника
+		this.φλ1 = null; // Координаты объекта по центру изображения
+		this.racursmark = null; // Отметка ракурса L.layerGroup
+		this.ini_marker = null; // Отметка начальной точки L.layer
+		this.dir = ['n', 'n', 'ne', 'ne', 'ne', 'ne', 'e', 'e', 'e', 'e', 'se', 'se', 'se', 'se', 's', 's', 's', 's', 'sw', 'sw', 'sw', 'sw', 'w', 'w', 'w', 'w', 'nw', 'nw', 'nw', 'nw', 'n', 'n' ]; // Индексы сторон света по долям в 11,25°
+//		this.dir = ['n', 'nne', 'nee', 'ne', 'ne', 'nee', 'nee', 'e', 'e', 'see', 'see', 'se', 'se', 'sse', 'sse', 's', 's', 'ssw', 'sww', 'sw', 'sw', 'sww', 'sww', 'w', 'w', 'nww', 'nww', 'nw', 'nw', 'nnw', 'nnw', 'n' ]; // Индексы сторон света по долям в 11,25°, на 16 направлений
+	},
+	voidageGeoPiont : function () { // Очистка всех пространственных данных 
+        this.mode == 0;
+	},
+	voidageDirection : function () { // Очистка направления
+        this.mode == 1;
+	},
+	voidageObserveAngle : function () { // Очистка угла обзора
+        this.mode == 2;
+	},
+	onMapGeoSelectionClick: function (e) {
+		this.φλ = [e.latlng.lat, e.latlng.lng];
+		if (this.mode == 0) { // выбор точки фотографа/худолжника
+			this.φλ0 = this.φλ;
+			if (this.racursmark)
+				map.removeLayer(this.racursmark);
+			if (this.ini_marker)
+				map.removeLayer(this.ini_marker);
+			this.ini_marker = L.marker(this.φλ0).bindPopup('Точка изображения').addTo(map);
+			this.mode = 1;
+			this.ini_marker.addEventListener('click', this.onCentralMarkerClick, this);
+		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
+			this.φλ1 = this.φλ;
+			var res = this.Δl_azimut (this.φλ0, this.φλ1);
+			this.mode = 2;
+			// Обрываем выбор тут
+			this.mode = 3;  this.geoSelectionComplete(res.α, res.Δl_m);
+		} else if (this.mode == 2) { // выбор угла обзора
+				var φλ2 = this.φλ;
+				var res = this.Δl_azimut (this.φλ0, φλ2);
+		}
+	},
+	onMapMouseMove : function (e) {
+		if (this.mode == 0) { // выбор точки фотографа/худолжника
+			return;
+		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
+			if (this.racursmark)
+					map.removeLayer(this.racursmark);
+			var φλ_ = [e.latlng.lat, e.latlng.lng];
+			var res = this.Δl_azimut (this.φλ0, φλ_);
+			if (res.Δl_m < 0.001) // Расстояние слишком мало
+				return;
+			// var c = {lat:this.φλ0[0], lng:this.φλ0[1]};
+			var sc = L.sector({
+				center: this.φλ0,
+				innerRadius: 0,
+				outerRadius: res.Δl_m,
+				startBearing: Math.floor(Number(res.α) - 22.5),
+				endBearing: Math.floor(Number(res.α) + 22.5),
+				fill: true,
+				fillColor: '#aa0000',
+				fillOpacity: 0.3,
+				color: '#FF0000',
+				opacity: 0.1,
+				weight: 0
+			});
+			this.racursmark = new L.LayerGroup();
+			this.racursmark.addLayer(
+				L.polyline(
+					[this.φλ0, φλ_],
+					{color: '#FF0000', weight: 1}
+				)
+			);
+			this.racursmark.addLayer(sc);
+			this.racursmark.addTo(map);
+		} else if (this.mode == 2) { // выбор угла обзора
+		}
+	},
+	onCentralMarkerClick : function (e) {
+		switch(this.mode) {
+			case 0: // выбор точки фотографа/худолжника
+				return;
+			case 1:  // выбор направления/объекта по центру фото (азимута)
+				this.φλ1 = null;
+				this.mode = 3;
+				this.geoSelectionComplete(null, 0.0);
+				break;
+			case 2:  // выбор угла обзора
+				break;
+		} // sw
+	},
+	geoSelectionComplete : function (α, Δl_m){ // Передача группы параметров ракурса
+			// Использование полученных данных
+			// this.φλ0 - точка фотографа / художника
+			// this.φλ1 - целевой / центральный объект
+			// α - азимут, текст до 2 знаков
+			// Δl_m - расстояние между точками в метрах по формуле гаверсинусов
+			L.popup().setLatLng(this.φλ0)
+				.setContent("≈" + Δl_m + " м, ∡ ≈" + α + "° </br>Направление: " + this.geo_α (α))
+				.openOn(map);
+	},
+	geo_α : function (α) { // Латинский индекс направления по значению азимутального угла
+		return α ? this.dir[Math.floor(α/11.25)] : null;
+	},
+	Δl_azimut : function (φλ0, φλ1) { // Функция определения азимута линии из точки 0 в точку 1 и примерного расстояния
+		function rad (x)
+			{ return x * Math.PI/180; }
+		var φ1 = rad (φλ0[0]); var λ1 = rad (φλ0[1]);
+		var φ2 = rad (φλ1[0]); var λ2 = rad (φλ1[1]);
+		var Δφ = rad (φλ1[0]-φλ0[0]);
+		var Δλ = rad (φλ1[1]-φλ0[1]);
 
-function onMapClick(e) {
-    obj.φλ = [e.latlng.lat, e.latlng.lng];
-    if (obj.iniclick){
-        obj.φλ0 = obj.φλ;
-        obj.iniclick = false;
-    if (obj.racursmark)
-        map.removeLayer(obj.racursmark);
-        if (obj.ini_marker)
-            map.removeLayer(obj.ini_marker);
-        obj.ini_marker = L.marker(obj.φλ0).bindPopup('Точка изображения').addTo(map);
-        obj.ini_marker.on('click', onMarkerClick);
+		var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+			  Math.cos(φ1) * Math.cos(φ2) *
+			  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+		var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-    } else {
-        obj.iniclick = true;
-        obj.φλ1 = obj.φλ;
-        obj.res = Δl_azimut (obj.φλ0, obj.φλ1);
-        L.popup().setLatLng(e.latlng)
-			.setContent("≈" + obj.res.Δl_m + " м, ∡ ≈" + obj.res.α + "° </br>Направление: " + geo_α (obj.res.α))
-			.openOn(map);
-    }
-}
+		const R_m = 6371e3; // r ♁
+		var Δl_m = R_m * c;
 
-function onMarkerClick(e) {
-        if (obj.φλ1)
-            return;
-        iniclick = true;
-        obj.φλ1 = null;
-        L.popup().setLatLng({lat: obj.φλ0[0], lng: obj.φλ0[1]})
-			.setContent(" Не выбрано направление, устанавливается в другом месте")
-			.openOn(map);    
-}
+		var y = Math.sin(λ2-λ1) * Math.cos(φ2);
+		var x = Math.cos(φ1)*Math.sin(φ2) -
+			  Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+		var θ = Math.atan2(y, x);
+		var α = (θ*180/Math.PI + 360) % 360; // °
+		return {
+			Δl_m: Δl_m.toFixed(2),
+			α:α.toFixed(3)
+		};
+	}
+};
 
-function geo_α (α)
-{
-    return obj.dir[Math.floor(α/11.25)];
-}
-
-function Δl_azimut (φλ0, φλ1) {
-    function rad (x)
-        { return x * Math.PI/180; }
-    var φ1 = rad (φλ0[0]); var λ1 = rad (φλ0[1]);
-    var φ2 = rad (φλ1[0]); var λ2 = rad (φλ1[1]);
-    var Δφ = rad (φλ1[0]-φλ0[0]);
-    var Δλ = rad (φλ1[1]-φλ0[1]);
-
-    var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-          Math.cos(φ1) * Math.cos(φ2) *
-          Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-    const R_m = 6371e3; // r ♁
-    var Δl_m = R_m * c;
-
-    var y = Math.sin(λ2-λ1) * Math.cos(φ2);
-    var x = Math.cos(φ1)*Math.sin(φ2) -
-          Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
-    var θ = Math.atan2(y, x);
-    var α = (θ*180/Math.PI + 360) % 360; // °
-    return {
-        Δl_m: Δl_m.toFixed(2),
-        α:α.toFixed(3)
-    };
-}
-
-map.on('click', onMapClick);
-map.addEventListener('mousemove', (event) => {
-    if (obj.iniclick)
-        return;
-    if (obj.racursmark){
-        map.removeLayer(obj.racursmark);
-        obj.racursmark = null;
-    }
-    var φλ_ = [event.latlng.lat, event.latlng.lng];
-    var pl = L.polyline(
-            [obj.φλ0, φλ_],
-            {color: '#FF0000', weight: 1}
-        );
-    var res = Δl_azimut (obj.φλ0, φλ_);
-    if (res.Δl_m < 0.001)
-        return;
-    var c = {lat:obj.φλ0[0], lng:obj.φλ0[1]};
-    var sc = L.sector({
-                center: c,
-                innerRadius: 0,
-                outerRadius: res.Δl_m,
-                startBearing: Math.floor(Number(res.α) - 22.5),
-                endBearing: Math.floor(Number(res.α) + 22.5),
-                fill: true,
-                fillColor: '#aa0000',
-                fillOpacity: 0.3,
-                color: '#FF0000',
-                opacity: 0.1,
-                weight: 0
-            });
-    obj.racursmark = new L.LayerGroup();
-    obj.racursmark.addLayer(pl);
-    obj.racursmark.addLayer(sc);
-    obj.racursmark.addTo(map);
-});
-
+	var obj = new Pseudoobj();
+	obj.create();
+	map.on('click', obj.onMapGeoSelectionClick, obj);
+	map.addEventListener('mousemove', obj.onMapMouseMove, obj);
 </script>
 </body>
 </html>
