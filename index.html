@@ -36,15 +36,33 @@
 
 function Pseudoobj () {} 
 Pseudoobj.prototype = { // оболочка псевдокласса
+	create: function (map) {
+        this.map = map;    
 
-	create: function () {
+
 		this.mode = 0; // 0 - выбор точки фотографа/худолжника 1 - выбор направления/объекта по центру фото (азимута) 2 - выбор угла обзора 4 - выбор сделан выбранной точки
 		this.φλ0 = null; // Координаты фотографа/худоджника
 		this.φλ1 = null; // Координаты объекта по центру изображения
-		this.racursmark = null; // Отметка ракурса L.layerGroup
+		this.racursmark = null; // Полная отметка ракурса L.layerGroup
 		this.ini_marker = null; // Отметка начальной точки L.layer
-		this.dir = ['n', 'n', 'ne', 'ne', 'ne', 'ne', 'e', 'e', 'e', 'e', 'se', 'se', 'se', 'se', 's', 's', 's', 's', 'sw', 'sw', 'sw', 'sw', 'w', 'w', 'w', 'w', 'nw', 'nw', 'nw', 'nw', 'n', 'n' ]; // Индексы сторон света по долям в 11,25°
+        this.sector = null; // Сектор обзора
+        this.α = null; // Азимут центральнгой оси изображения
+        this.β = null; // Угол оси обзора
+        this.Δl_m = null; // Метрическое расстояние между основными точками
+		this.dir = [
+            'n', 'n', 
+            'ne', 'ne', 'ne', 'ne', 
+            'e', 'e', 'e', 'e',
+            'se', 'se', 'se', 'se',
+            's', 's', 's', 's',
+            'sw', 'sw', 'sw', 'sw',
+            'w', 'w', 'w', 'w',
+            'nw', 'nw', 'nw', 'nw',
+            'n', 'n'
+        ]; // Индексы сторон света по долям в 11,25°
 //		this.dir = ['n', 'nne', 'nee', 'ne', 'ne', 'nee', 'nee', 'e', 'e', 'see', 'see', 'se', 'se', 'sse', 'sse', 's', 's', 'ssw', 'sww', 'sw', 'sw', 'sww', 'sww', 'w', 'w', 'nww', 'nww', 'nw', 'nw', 'nnw', 'nnw', 'n' ]; // Индексы сторон света по долям в 11,25°, на 16 направлений
+	this.map.on('click', obj.onMapGeoSelectionClick, obj);
+	this.map.addEventListener('mousemove', obj.onMapMouseMove, obj);
 	},
 	voidageGeoPiont : function () { // Очистка всех пространственных данных 
 	  this.mode == 0;
@@ -60,47 +78,52 @@ Pseudoobj.prototype = { // оболочка псевдокласса
 		if (this.mode == 0) { // выбор точки фотографа/худолжника
 			this.φλ0 = this.φλ;
 			if (this.racursmark)
-				map.removeLayer(this.racursmark);
+				this.map.removeLayer(this.racursmark);
 			if (this.ini_marker)
-				map.removeLayer(this.ini_marker);
-			this.ini_marker = L.marker(this.φλ0).bindPopup('Точка изображения').addTo(map);
+				this.map.removeLayer(this.ini_marker);
+			this.ini_marker = L.marker(this.φλ0).bindPopup('Точка изображения').addTo(this.map);
 			this.mode = 1;
 			this.ini_marker.addEventListener('click', this.onCentralMarkerClick, this);
 		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
 			this.φλ1 = this.φλ;
-			var res = this.Δl_azimut (this.φλ0, this.φλ1);
+            var rs = this.Δl_azimut(this.φλ0, this.φλ1);
+            this.α = rs.α;
+            this.Δl_m = rs.Δl_m;
 			this.mode = 2;
-			// Обрываем выбор тут
-			this.mode = 3;  this.geoSelectionComplete(res.α, res.Δl_m);
 		} else if (this.mode == 2) { // выбор угла обзора
-				var φλ2 = this.φλ;
-				var res = this.Δl_azimut (this.φλ0, φλ2);
+			var φλ2 = this.φλ;
+			this.β = Math.abs(this.Δl_azimut(this.φλ0, φλ2).α - this.α) * 2.0;
+			this.mode = 3;
+            this.geoSelectionComplete();
 		}
 	},
+    viewSector : function (α, Δl_m, β) { // Сектор по азимуту, расстоянию и углу обзора
+        var diff = β / 2.0;
+        return L.sector({
+			center: this.φλ0,
+			innerRadius: 0,
+			outerRadius: Δl_m,
+			startBearing: Math.floor(Number(α) - diff),
+			endBearing: Math.floor(Number(α) + diff),
+			fill: true,
+			fillColor: '#aa0000',
+			fillOpacity: 0.3,
+			color: '#FF0000',
+			opacity: 0.1,
+			weight: 0
+		});
+    },
 	onMapMouseMove : function (e) {
 		if (this.mode == 0) { // выбор точки фотографа/худолжника
 			return;
 		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
 			if (this.racursmark)
-					map.removeLayer(this.racursmark);
+				this.map.removeLayer(this.racursmark);
 			var φλ_ = [e.latlng.lat, e.latlng.lng];
 			var res = this.Δl_azimut (this.φλ0, φλ_);
 			if (res.Δl_m < 0.001) // Расстояние слишком мало
 				return;
-			// var c = {lat:this.φλ0[0], lng:this.φλ0[1]};
-			var sc = L.sector({
-				center: this.φλ0,
-				innerRadius: 0,
-				outerRadius: res.Δl_m,
-				startBearing: Math.floor(Number(res.α) - 22.5),
-				endBearing: Math.floor(Number(res.α) + 22.5),
-				fill: true,
-				fillColor: '#aa0000',
-				fillOpacity: 0.3,
-				color: '#FF0000',
-				opacity: 0.1,
-				weight: 0
-			});
+            this.sector = this.viewSector(res.α, res.Δl_m, 45.0);
 			this.racursmark = new L.LayerGroup();
 			this.racursmark.addLayer(
 				L.polyline(
@@ -108,9 +131,15 @@ Pseudoobj.prototype = { // оболочка псевдокласса
 					{color: '#FF0000', weight: 1}
 				)
 			);
-			this.racursmark.addLayer(sc);
-			this.racursmark.addTo(map);
+			this.racursmark.addLayer(this.sector);
+			this.racursmark.addTo(this.map);
 		} else if (this.mode == 2) { // выбор угла обзора
+            if (this.sector)
+				this.map.removeLayer(this.sector);
+			var φλ_ = [e.latlng.lat, e.latlng.lng];
+			var β = Math.abs(this.Δl_azimut(this.φλ0, φλ_).α - this.α) * 2.0;
+            this.sector = this.viewSector(this.α, this.Δl_m, β);
+            this.racursmark.addLayer(this.sector);
 		}
 	},
 	onCentralMarkerClick : function (e) {
@@ -120,7 +149,7 @@ Pseudoobj.prototype = { // оболочка псевдокласса
 			case 1:  // выбор направления/объекта по центру фото (азимута)
 				this.φλ1 = null;
 				this.mode = 3;
-				this.geoSelectionComplete(null, 0.0);
+				this.geoSelectionComplete();
 				break;
 			case 2:  // выбор угла обзора
 				break;
@@ -130,11 +159,12 @@ Pseudoobj.prototype = { // оболочка псевдокласса
 			// Использование полученных данных
 			// this.φλ0 - точка фотографа / художника
 			// this.φλ1 - целевой / центральный объект
-			// α - азимут, текст до 2 знаков
+			// α - азимут
 			// Δl_m - расстояние между точками в метрах по формуле гаверсинусов
+
 			L.popup().setLatLng(this.φλ0)
-				.setContent("≈" + Δl_m + " м, ∡ ≈" + α + "° </br>Направление: " + this.geo_α (α))
-				.openOn(map);
+				.setContent("Δl ≈" + this.Δl_m.toFixed(2) + " м, α ∡ ≈" + this.α.toFixed(3) + "°, β ⏿ ≈" + this.β.toFixed(3) + " </br>Направление: " + this.geo_α(this.α))
+				.openOn(this.map);
     		this.mode = 0;
 	},
 	geo_α : function (α) { // Латинский индекс направления по значению азимутального угла
@@ -162,16 +192,14 @@ Pseudoobj.prototype = { // оболочка псевдокласса
 		var θ = Math.atan2(y, x);
 		var α = (θ*180/Math.PI + 360) % 360; // °
 		return {
-			Δl_m: Δl_m.toFixed(2),
-			α:α.toFixed(3)
+			Δl_m: Δl_m,
+			α:α
 		};
 	}
 };
 
 	var obj = new Pseudoobj();
-	obj.create();
-	map.on('click', obj.onMapGeoSelectionClick, obj);
-	map.addEventListener('mousemove', obj.onMapMouseMove, obj);
+	obj.create(map);
 </script>
 </body>
 </html>
