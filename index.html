@@ -72,25 +72,31 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 	this.map.addEventListener('mousemove', obj.onMapMouseMove, obj);
 	},
 	voidageGeoData : function () { // Очистка всех пространственных данных
-		this.mode == 0;
+		if (this.ini_marker)
+			this.map.removeLayer(this.ini_marker);
 		this.φλ0 = null; // Координаты фотографа/худоджника
 		this.ini_marker = null; // Отметка начальной точки L.layer
-		this.voidageDirection();
+		this.voidageDirection();		
+		this.iniGeoEditMode();
 	},
 	voidageDirection : function () { // Очистка направления
-		this.mode == 1;
-		this.φλ1 = null; // Координаты объекта по центру изображения
-		this.racursmark = null; // Полная отметка ракурса L.layerGroup		
-		this.sector = null; // Сектор обзора
+		if (this.racursmark)
+			this.map.removeLayer(this.racursmark);
+		this.racursmark = null; // Полная отметка ракурса L.layerGroup
 		this.p.geoCalc.α = null; // Азимут центральнгой оси изображения
 		this.p.geoCalc.Δl_m = null; // Метрическое расстояние между основными точками
+		this.φλ1 = null; // Координаты объекта по центру изображения
 		this.voidageObserveAngle();
+		this.iniGeoEditMode();
 	},
 	voidageObserveAngle : function () { // Очистка угла обзора
-		this.mode == 2;
+		if (this.sector)
+			this.map.removeLayer(this.sector);
+		this.sector = null; // Сектор обзора
 		this.β = null; // Угол оси обзора
 		this.p.geoCalc.α1 = null;
 		this.p.geoCalc.α2 = null;
+		this.iniGeoEditMode();		
 	},
 	iniGeoEditMode : function (){ // По состоянию объекта определяем что рисовать и как он заполнен
 		if (!this.φλ0){
