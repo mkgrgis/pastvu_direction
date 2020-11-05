@@ -95,7 +95,8 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 				this.map.removeLayer(this.racursmark);
 			if (this.ini_marker)
 				this.map.removeLayer(this.ini_marker);
-			this.ini_marker = L.marker(this.φλ0).bindPopup('Точка изображения').addTo(this.map);
+			this.ini_marker = L.marker(this.φλ0).addTo(this.map);
+			this.ini_marker.bindTooltip('Нажмите для завершения выбора, </br> если направление вида </br> Вам непонятно');
 			this.mode = 1;
 			this.ini_marker.addEventListener('click', this.onCentralMarkerClick, this);
 		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
@@ -103,6 +104,7 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			var rs = this.Δl_azimut(this.φλ0, this.φλ1);
 			this.p.geoCalc.α = rs.α;
 			this.p.geoCalc.Δl_m = rs.Δl_m;
+			this.ini_marker.bindTooltip('Нажмите для завершения выбора, </br> если угол обзора </br> Вам не ясен');
 			this.mode = 2;
 		} else if (this.mode == 2) { // выбор угла обзора
 			var φλ2 = this.φλ;
@@ -111,6 +113,7 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			this.p.geoCalc.α1 = (this.p.geoCalc.α - Δβ);
 			this.p.geoCalc.α2 = (this.p.geoCalc.α + Δβ);
 			//	this.mode = 3;
+			this.ini_marker.unbindTooltip();
 			this.mode = 4;
 			this.geoSelectionComplete();
 		} else if (this.mode == 3) { // резерв для выбора высотной координаты
@@ -176,6 +179,8 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			this.mode = 4;
 			this.geoSelectionComplete();
 		} else if (this.mode == 2) { // выбор угла обзора
+			if (this.sector)
+				this.map.removeLayer(this.sector);
 			this.β = null;
 			this.mode = 4;
 			this.geoSelectionComplete();
