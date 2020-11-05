@@ -6,7 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
 	<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
-	<script src="leaflet.sector.js"></script>
+	<script src="Semicircle.js"></script>
 	<style>
 		html, body {
 			height: 100%;
@@ -40,13 +40,16 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		this.p = {};
 
 				
-		this.p.geoCalc = {};
-		this.mode = 0;
-		// 0 - выбор точки фотографа/худолжника this.φλ0
+		this.p.geoCalc = {}; // Для хранения вычислимых параметров ракурса и обзора, в геодезической нотации
+//		this.mode = 0;
+		// 0 - выбор точки фотографа/художника this.φλ0
 		// 1 - выбор направления/объекта по центру фото (азимута) this.φλ1 this.p.geoCalc.α this.p.geoCalc.Δl_m
 		// 2 - выбор угла обзора this.β
 		// 3 - резерв для высотной координаты
 		// 4 - выбор сделан выбранной точки
+		this.iniGeoEditMode(); // Определили заполненность данных по состоянию полей самого объекта
+		this.iniGeoPointLayers(); // Нарисовали то, для чего достаточно данных
+/// ИЛИ ЗАВЕДОМО ПУСТАЯ ИНИЦИАЛИЗАЦИЯ
 		this.voidageGeoData(); // Сброс всех географических данных
 		this.dir = [
 			'n', 'n',
@@ -86,19 +89,58 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 	voidageObserveAngle : function () { // Очистка угла обзора
 		this.mode == 2;
 		this.β = null; // Угол оси обзора
+		this.p.geoCalc.α1 = null;
+		this.p.geoCalc.α2 = null;
 	},
-	onMapGeoSelectionClick: function (e) {
+	iniGeoEditMode : function (){ // По состоянию объекта определяем что рисовать и как он заполнен
+		if (!this.φλ0){
+			this.mode = 0; // выбор точки фотографа/художника
+			return;
+		}
+		if (!this.φλ1 || this.point.dir){
+			this.mode = 1; // выбор направления/объекта по центру фото (азимута)
+			return;
+		}
+		if (!this.β){
+			this.mode = 2; // выбор угла обзора
+			return;
+		}
+	},
+	iniGeoPointLayers : function (){ // Отрисовка заполненных данных
+		if (this.mode == 0) { // выбор точки фотографа/художника
+			return; // Не заполнено ничего
+		} else if (this.mode > 0) { // выбор направления/объекта по центру фото (азимута)
+			this.ini_marker = L.marker(this.φλ0).addTo(this.map);
+		} else if (this.mode > 1) { // выбор угла обзора
+			this.racursmark = new L.LayerGroup();
+			this.racursmark.addLayer(
+				L.polyline(
+					[this.φλ0, φλ1],
+					{color: '#FF0000', weight: 1}
+				)
+			);
+			this.racursmark.addTo(this.map);			
+		} else if (this.mode > 2) { // резерв для выбора высотной координаты
+			this.sector = this.viewSector(this.p.geoCalc.α, this.p.geoCalc.Δl_m, β);
+			this.racursmark.addLayer(this.sector);
+		}
+	},
+	setIniMarker : function () {
+		if (this.ini_marker)
+			this.map.removeLayer(this.ini_marker);
+		this.ini_marker = L.marker(this.φλ0).addTo(this.map);
+		this.ini_marker.bindTooltip('Нажмите для завершения выбора, </br> если направление вида </br> Вам непонятно');
+		this.mode = 1;
+		this.ini_marker.addEventListener('click', this.onCentralMarkerClick, this);
+		this.ini_marker.addEventListener('drag', this.onCentralMarkerDrag, this);
+	},
+	onMapGeoSelectionClick : function (e) {
 		this.φλ = [e.latlng.lat, e.latlng.lng];
-		if (this.mode == 0) { // выбор точки фотографа/худолжника
+		if (this.mode == 0) { // выбор точки фотографа/художника
 			this.φλ0 = this.φλ;
 			if (this.racursmark)
 				this.map.removeLayer(this.racursmark);
-			if (this.ini_marker)
-				this.map.removeLayer(this.ini_marker);
-			this.ini_marker = L.marker(this.φλ0).addTo(this.map);
-			this.ini_marker.bindTooltip('Нажмите для завершения выбора, </br> если направление вида </br> Вам непонятно');
-			this.mode = 1;
-			this.ini_marker.addEventListener('click', this.onCentralMarkerClick, this);
+			this.setIniMarker();
 		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
 			this.φλ1 = this.φλ;
 			var rs = this.Δl_azimut(this.φλ0, this.φλ1);
@@ -127,22 +169,19 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			α1 += 180.0;
 			α2 -= 180.0;
 		}
-		return L.sector({
-			center: this.φλ0,
-			innerRadius: 0,
-			outerRadius: Δl_m,
-			startBearing: α1,
-			endBearing: α2,
-			fill: true,
-			fillColor: '#aa0000',
-			fillOpacity: 0.3,
-			color: '#FF0000',
-			opacity: 0.1,
-			weight: 0
-		});
+		return L.semiCircle(this.φλ0, {
+            radius: Δl_m,
+            fill: true,
+            fillColor:'#aa0000',
+            fillOpacity: 0.3,
+            color: '#ff0000',
+            opacity: 0.1,
+            startAngle: α1,
+            stopAngle: α2
+        }).addTo(map);
 	},
 	onMapMouseMove : function (e) {
-		if (this.mode == 0) { // выбор точки фотографа/худолжника
+		if (this.mode == 0) { // выбор точки фотографа/художника
 			return;
 		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
 			if (this.racursmark)
@@ -172,7 +211,7 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		}
 	},
 	onCentralMarkerClick : function (e) {
-		if (this.mode == 0) { // выбор точки фотографа/худолжника
+		if (this.mode == 0) { // выбор точки фотографа/художника
 			return;
 		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
 			this.φλ1 = null;
@@ -187,6 +226,20 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		} else if (this.mode == 3) { // резерв для выбора высотной координаты
 		}
 	},
+	onCentralMarkerDrag : function(e) {
+		this.φλ0 = [e.latlng.lat, e.latlng.lng];
+		if (this.racursmark)
+			this.map.removeLayer(this.racursmark);
+		if (this.mode == 0) { // выбор точки фотографа/художника
+			return;
+		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
+
+		} else if (this.mode == 2) { // выбор угла обзора
+
+		} else if (this.mode == 3) { // резерв для выбора высотной координаты
+		}
+		console.log('marker drag event');
+    },
 	geoSelectionComplete : function (){
 		// Использование полученных данных
 		// this.φλ0 - точка фотографа / художника
@@ -206,7 +259,9 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		L.popup().setLatLng(this.φλ0)
 			.setContent("Δl ≈" + (this.p.geoCalc.Δl_m ? this.p.geoCalc.Δl_m.toFixed(2) : null) + " м, α ∡ ≈" + (this.p.geoCalc.α ? this.p.geoCalc.α.toFixed(3) : null) + "°, β ⏿ ≈" + (this.β ? this.β.toFixed(3) : null) + " </br>Направление: " + this.geo_α(this.p.geoCalc.α))
 			.openOn(this.map);
-		this.mode = 0;
+
+		this.voidageGeoData(); // Сброс всех географических данных
+		this.iniGeoEditMode(); // Определили заполненность данных по состоянию полей самого объекта
 	},
 	geo_α : function (α) { // Латинский индекс направления по значению азимутального угла
 		return α ? this.dir[Math.floor(α/11.25)] : null;
