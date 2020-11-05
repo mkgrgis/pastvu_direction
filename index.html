@@ -37,10 +37,13 @@
 function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевдокласса
 	create: function (map) {
 		this.map = map;	
+		this.p = {};
 
+				
+		this.p.geoCalc = {};
 		this.mode = 0;
 		// 0 - выбор точки фотографа/худолжника this.φλ0
-		// 1 - выбор направления/объекта по центру фото (азимута) this.φλ1 this.α this.Δl_m
+		// 1 - выбор направления/объекта по центру фото (азимута) this.φλ1 this.p.geoCalc.α this.p.geoCalc.Δl_m
 		// 2 - выбор угла обзора this.β
 		// 3 - резерв для высотной координаты
 		// 4 - выбор сделан выбранной точки
@@ -76,8 +79,8 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		this.φλ1 = null; // Координаты объекта по центру изображения
 		this.racursmark = null; // Полная отметка ракурса L.layerGroup		
 		this.sector = null; // Сектор обзора
-		this.α = null; // Азимут центральнгой оси изображения
-		this.Δl_m = null; // Метрическое расстояние между основными точками
+		this.p.geoCalc.α = null; // Азимут центральнгой оси изображения
+		this.p.geoCalc.Δl_m = null; // Метрическое расстояние между основными точками
 		this.voidageObserveAngle();
 	},
 	voidageObserveAngle : function () { // Очистка угла обзора
@@ -98,12 +101,15 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
 			this.φλ1 = this.φλ;
 			var rs = this.Δl_azimut(this.φλ0, this.φλ1);
-			this.α = rs.α;
-			this.Δl_m = rs.Δl_m;
+			this.p.geoCalc.α = rs.α;
+			this.p.geoCalc.Δl_m = rs.Δl_m;
 			this.mode = 2;
 		} else if (this.mode == 2) { // выбор угла обзора
 			var φλ2 = this.φλ;
-			this.β = Math.abs(this.Δl_azimut(this.φλ0, φλ2).α - this.α) * 2.0;
+			this.β = Math.abs(this.Δl_azimut(this.φλ0, φλ2).α - this.p.geoCalc.α) * 2.0;
+			var Δβ = this.β / 2.0;
+			this.p.geoCalc.α1 = (this.p.geoCalc.α - Δβ);
+			this.p.geoCalc.α2 = (this.p.geoCalc.α + Δβ);
 			//	this.mode = 3;
 			this.mode = 4;
 			this.geoSelectionComplete();
@@ -115,8 +121,8 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		var α1 = (α - Δβ);
 		var α2 = (α + Δβ);
 		if (Δβ > 180.0){
-			α1 = α1 + 180.0;
-			α2 = α2 - 180.0;
+			α1 += 180.0;
+			α2 -= 180.0;
 		}
 		return L.sector({
 			center: this.φλ0,
@@ -156,34 +162,44 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			if (this.sector)
 				this.map.removeLayer(this.sector);
 			var φλ_ = [e.latlng.lat, e.latlng.lng];
-			var β = Math.abs(this.Δl_azimut(this.φλ0, φλ_).α - this.α) * 2.0;
-			this.sector = this.viewSector(this.α, this.Δl_m, β);
+			var β = Math.abs(this.Δl_azimut(this.φλ0, φλ_).α - this.p.geoCalc.α) * 2.0;
+			this.sector = this.viewSector(this.p.geoCalc.α, this.p.geoCalc.Δl_m, β);
 			this.racursmark.addLayer(this.sector);
 		} else if (this.mode == 3) { // резерв для выбора высотной координаты
 		}
 	},
 	onCentralMarkerClick : function (e) {
-		switch(this.mode) {
-			case 0: // выбор точки фотографа/худолжника
-				return;
-			case 1:  // выбор направления/объекта по центру фото (азимута)
-				this.φλ1 = null;
-				this.mode = 3;
-				this.geoSelectionComplete();
-				break;
-			case 2:  // выбор угла обзора
-				break;
-		} // sw
+		if (this.mode == 0) { // выбор точки фотографа/худолжника
+			return;
+		} else if (this.mode == 1) { // выбор направления/объекта по центру фото (азимута)
+			this.φλ1 = null;
+			this.mode = 4;
+			this.geoSelectionComplete();
+		} else if (this.mode == 2) { // выбор угла обзора
+			this.β = null;
+			this.mode = 4;
+			this.geoSelectionComplete();
+		} else if (this.mode == 3) { // резерв для выбора высотной координаты
+		}
 	},
 	geoSelectionComplete : function (){
 		// Использование полученных данных
 		// this.φλ0 - точка фотографа / художника
 		// this.φλ1 - целевой / центральный объект
-		// α - азимут
-		// Δl_m - расстояние между точками в метрах по формуле гаверсинусов
+		// this.p.geoCalc.α - центральный азимут изображения
+		// this.p.geoCalc.Δl_m - расстояние между точками в метрах по формуле гаверсинусов
+		// this.β - угол обзора
+		// this.p.geoCalc.α1 - начальный азимут обзора
+		// this.p.geoCalc.α2 - конечный азимут обзора
+
+		console.log('Результат выбора точек и угла обзора');
+		console.log('основа' , this.φλ0);
+		console.log('центр' , this.φλ1);
+		console.log('обзор' , this.β);
+		console.log(this.p.geoCalc);
 
 		L.popup().setLatLng(this.φλ0)
-			.setContent("Δl ≈" + this.Δl_m.toFixed(2) + " м, α ∡ ≈" + this.α.toFixed(3) + "°, β ⏿ ≈" + this.β.toFixed(3) + " </br>Направление: " + this.geo_α(this.α))
+			.setContent("Δl ≈" + (this.p.geoCalc.Δl_m ? this.p.geoCalc.Δl_m.toFixed(2) : null) + " м, α ∡ ≈" + (this.p.geoCalc.α ? this.p.geoCalc.α.toFixed(3) : null) + "°, β ⏿ ≈" + (this.β ? this.β.toFixed(3) : null) + " </br>Направление: " + this.geo_α(this.p.geoCalc.α))
 			.openOn(this.map);
 		this.mode = 0;
 	},
