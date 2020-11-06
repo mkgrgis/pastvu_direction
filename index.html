@@ -44,14 +44,14 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 //		this.mode = 0;
 		// 0 - выбор точки фотографа/художника this.φλ0
 		// 1 - выбор направления/объекта по центру фото (азимута) this.φλ1 this.p.geoCalc.α this.p.geoCalc.Δl_m
-		// 2 - выбор угла обзора this.β
+		// 2 - выбор угла обзора this.β this.p.geoCalc.α1 this.p.geoCalc.α2
 		// 3 - резерв для высотной координаты
 		// 4 - выбор сделан выбранной точки
 		this.iniGeoEditMode(); // Определили заполненность данных по состоянию полей самого объекта
 		this.iniGeoPointLayers(); // Нарисовали то, для чего достаточно данных
 /// ИЛИ ЗАВЕДОМО ПУСТАЯ ИНИЦИАЛИЗАЦИЯ
 		this.voidageGeoData(); // Сброс всех географических данных
-		this.dir = [
+		this.dir = [ // Индексы сторон света по долям в 11,25° 8 направлений
 			'n', 'n',
 			'ne', 'ne', 'ne', 'ne',
 			'e', 'e', 'e', 'e',
@@ -61,13 +61,25 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			'w', 'w', 'w', 'w',
 			'nw', 'nw', 'nw', 'nw',
 			'n', 'n'
-		]; // Индексы сторон света по долям в 11,25° 8 направлений
-	/*	this.dir = [
+		]; 
+		this.dir_α = { // Азимуты по умолчанию для направлений
+			null: null,
+			n : 0.0,
+			ne : 45.0,
+			e : 90.0,
+			se : 135.0,
+			s : 180.0,
+			sw : 225.0,
+			w : 270.0,
+			nw: 315.0
+		}
+
+	/*	this.dir = [ // Индексы сторон света по долям в 11,25°, на 16 направлений 
 			'n', 'nne', 'nee', 'ne', 'ne', 'nee', 'nee', 'e',
 			'e', 'see', 'see', 'se', 'se', 'sse', 'sse', 's',
 			's', 'ssw', 'sww', 'sw', 'sw', 'sww', 'sww', 'w',
 			'w', 'nww', 'nww', 'nw', 'nw', 'nnw', 'nnw', 'n'
-		]; // Индексы сторон света по долям в 11,25°, на 16 направлений */
+		]; */
 	this.map.on('click', obj.onMapGeoSelectionClick, obj);
 	this.map.addEventListener('mousemove', obj.onMapMouseMove, obj);
 	},
@@ -121,7 +133,7 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			this.racursmark = new L.LayerGroup();
 			this.racursmark.addLayer(
 				L.polyline(
-					[this.φλ0, φλ1],
+					[this.φλ0, this.φλ1],
 					{color: '#FF0000', weight: 1}
 				)
 			);
@@ -263,7 +275,7 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		console.log(this.p.geoCalc);
 
 		L.popup().setLatLng(this.φλ0)
-			.setContent("Δl ≈" + (this.p.geoCalc.Δl_m ? this.p.geoCalc.Δl_m.toFixed(2) : null) + " м, α ∡ ≈" + (this.p.geoCalc.α ? this.p.geoCalc.α.toFixed(3) : null) + "°, β ⏿ ≈" + (this.β ? this.β.toFixed(3) : null) + " </br>Направление: " + this.geo_α(this.p.geoCalc.α))
+			.setContent("Δl ≈" + (this.p.geoCalc.Δl_m ? this.p.geoCalc.Δl_m.toFixed(2) : null) + " м, ∡ α≈" + (this.p.geoCalc.α ? this.p.geoCalc.α.toFixed(3) : null) + "°, ⏿ β≈" + (this.β ? this.β.toFixed(3) : null) + " </br>Направление: " + this.geo_α(this.p.geoCalc.α))
 			.openOn(this.map);
 
 		this.voidageGeoData(); // Сброс всех географических данных
@@ -284,18 +296,15 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			  Math.cos(φ1) * Math.cos(φ2) *
 			  Math.sin(Δλ/2) * Math.sin(Δλ/2);
 		var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-		const R_m = 6371e3; // r ♁
-		var Δl_m = R_m * c;
-
 		var y = Math.sin(λ2-λ1) * Math.cos(φ2);
 		var x = Math.cos(φ1)*Math.sin(φ2) -
 			  Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
 		var θ = Math.atan2(y, x);
-		var α = (θ*180/Math.PI + 360) % 360; // °
+
+		const R_m = 6371e3; // r ♁
 		return {
-			Δl_m: Δl_m,
-			α:α
+			Δl_m: R_m * c,
+			α:(θ*180/Math.PI + 360) % 360 // °
 		};
 	}
 };
