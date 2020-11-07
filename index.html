@@ -71,7 +71,8 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			s : 180.0,
 			sw : 225.0,
 			w : 270.0,
-			nw: 315.0
+			nw: 315.0,
+			aero: NaN
 		}
 
 	/*	this.dir = [ // Индексы сторон света по долям в 11,25°, на 16 направлений 
@@ -124,11 +125,27 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 			return;
 		}
 	},
+	createIniMarker : function() {
+		this.ini_marker = L.marker(
+			this.φλ0, {
+	            draggable: true,
+	            title: 'Точка съёмки',
+                icon: L.icon({
+                    iconSize: [26, 43],
+                    iconAnchor: [13, 36],
+                    iconUrl: 'pinEdit.png',
+                    className: 'pointMarkerEdit'
+                })
+            })
+			.addEventListener('click', this.onCentralMarkerClick, this)
+			.addEventListener('dragend', this.onCentralMarkerDragEnd, this)
+			.addTo(this.map);
+	},
 	iniGeoPointLayers : function (){ // Отрисовка заполненных данных
 		if (this.mode == 0) { // выбор точки фотографа/художника
 			return; // Не заполнено ничего
 		} else if (this.mode > 0) { // выбор направления/объекта по центру фото (азимута)
-			this.ini_marker = L.marker(this.φλ0).addTo(this.map);
+			this.createIniMarker();			
 		} else if (this.mode > 1) { // выбор угла обзора
 			this.racursmark = new L.LayerGroup();
 			this.racursmark.addLayer(
@@ -146,11 +163,9 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 	setIniMarker : function () {
 		if (this.ini_marker)
 			this.map.removeLayer(this.ini_marker);
-		this.ini_marker = L.marker(this.φλ0).addTo(this.map);
+		this.createIniMarker();
 		this.ini_marker.bindTooltip('Нажмите для завершения выбора, </br> если направление вида </br> Вам непонятно');
 		this.mode = 1;
-		this.ini_marker.addEventListener('click', this.onCentralMarkerClick, this);
-		this.ini_marker.addEventListener('drag', this.onCentralMarkerDrag, this);
 	},
 	onMapGeoSelectionClick : function (e) {
 		this.φλ = [e.latlng.lat, e.latlng.lng];
@@ -244,8 +259,9 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		} else if (this.mode == 3) { // резерв для выбора высотной координаты
 		}
 	},
-	onCentralMarkerDrag : function(e) {
-		this.φλ0 = [e.latlng.lat, e.latlng.lng];
+	onCentralMarkerDragEnd : function(e) {
+		var ll = e.target.getLatLng();
+		this.φλ0 = [ll.lat, ll.lng];
 		if (this.racursmark)
 			this.map.removeLayer(this.racursmark);
 		if (this.mode == 0) { // выбор точки фотографа/художника
