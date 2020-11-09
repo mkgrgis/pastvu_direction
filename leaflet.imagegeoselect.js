@@ -1,47 +1,45 @@
 function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевдокласса
-	create: function (map) {
-		this.map = map;
-		this.p = {};
-		this.point = {};
-		this.point.dir = 'n';
+create: function (map) {
+	this.map = map;
+	this.p = {};
+	this.point = {};
+	this.point.dir = 's';
 
+	this.geoCalc = {}; // Для хранения вычислимых параметров ракурса и обзора, в геодезической нотации
+	this.layers = {};
+	this.dir = [ // Индексы сторон света по долям в 11,25° 8 направлений
+		'n', 'n',
+		'ne', 'ne', 'ne', 'ne',
+		'e', 'e', 'e', 'e',
+		'se', 'se', 'se', 'se',
+		's', 's', 's', 's',
+		'sw', 'sw', 'sw', 'sw',
+		'w', 'w', 'w', 'w',
+		'nw', 'nw', 'nw', 'nw',
+		'n', 'n'
+	];
+	/*	this.dir = [ // Индексы сторон света по долям в 11,25°, на 16 направлений
+		'n', 'nne', 'nee', 'ne', 'ne', 'nee', 'nee', 'e',
+		'e', 'see', 'see', 'se', 'se', 'sse', 'sse', 's',
+		's', 'ssw', 'sww', 'sw', 'sw', 'sww', 'sww', 'w',
+		'w', 'nww', 'nww', 'nw', 'nw', 'nnw', 'nnw', 'n'
+	]; */
+	this.dir_α = { // Default α for legacy directions
+		null: null,
+		n : 0.0,
+		ne : 45.0,
+		e : 90.0,
+		se : 135.0,
+		s : 180.0,
+		sw : 225.0,
+		w : 270.0,
+		nw: 315.0,
+		aero: NaN
+	}
+	this.marker_φλ0_mode1_tooltip = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить направление вида';
+	this.marker_φλ0_mode2_tooltip = 'Это точка <b>точка объекта на вертикальной оси</b> изображения,</br> обозначаемая <b>φλ₁</b></br>Нажмите на значок для завершения, если</br> затруднительно определить угол обзора';
 
-		this.geoCalc = {}; // Для хранения вычислимых параметров ракурса и обзора, в геодезической нотации
-		this.layers = {};
-		this.drawGeoSelectionLayers(); // Нарисовали то, для чего достаточно данных
-
-		this.dir = [ // Индексы сторон света по долям в 11,25° 8 направлений
-			'n', 'n',
-			'ne', 'ne', 'ne', 'ne',
-			'e', 'e', 'e', 'e',
-			'se', 'se', 'se', 'se',
-			's', 's', 's', 's',
-			'sw', 'sw', 'sw', 'sw',
-			'w', 'w', 'w', 'w',
-			'nw', 'nw', 'nw', 'nw',
-			'n', 'n'
-		];
-		/*	this.dir = [ // Индексы сторон света по долям в 11,25°, на 16 направлений
-			'n', 'nne', 'nee', 'ne', 'ne', 'nee', 'nee', 'e',
-			'e', 'see', 'see', 'se', 'se', 'sse', 'sse', 's',
-			's', 'ssw', 'sww', 'sw', 'sw', 'sww', 'sww', 'w',
-			'w', 'nww', 'nww', 'nw', 'nw', 'nnw', 'nnw', 'n'
-		]; */
-		this.dir_α = { // Default α for legacy directions
-			null: null,
-			n : 0.0,
-			ne : 45.0,
-			e : 90.0,
-			se : 135.0,
-			s : 180.0,
-			sw : 225.0,
-			w : 270.0,
-			nw: 315.0,
-			aero: NaN
-		}
-		this.marker_φλ0_mode1_tooltip = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить направление вида';
-		this.marker_φλ0_mode2_tooltip = 'Это точка <b>точка объекта на вертикальной оси</b> изображения,</br> обозначаемая <b>φλ₁</b></br>Нажмите на значок для завершения, если</br> затруднительно определить угол обзора';
-
+	this.drawGeoSelectionLayers(); // Нарисовали то, для чего достаточно данных
 
 	this.map.addEventListener('click', this.onMapGeoSelectionClick, this);
 	this.map.addEventListener('mousemove', this.onMapMouseMove, this);
@@ -127,6 +125,47 @@ function Pseudoobj () {}	Pseudoobj.prototype = { // оболочка псевд�
 		    }, this)
 			.addEventListener('click', this.onCentralMarkerClick, this)
 			.addTo(this.map);
+		if (this.point.dir){
+			var α = this.dir_α[this.point.dir];
+			if (!α.isNaN && !this.layers.old_dir)
+				L.sector({
+					center: this.φλ0,
+					innerRadius: 2.0,
+					outerRadius: 250.0,
+					startBearing: α - 15.0,
+					endBearing :α + 15.0,
+					fill: true,
+					fillColor:'#f754e1',
+					fillOpacity: 0.2,
+					color: '#f754e1',
+					opacity: 0.4,
+					weight: 1
+				})		
+			.addTo(this.map);
+		const R_m = 6371e3; // r ♁
+		function rad (x)
+			{ return x * Math.PI/180; }
+		var φ1 = rad (this.φλ0[0]);
+		var λ1 = rad (this.φλ0[1]);
+		var α_rd = rad (α);
+		var Δ_θ = 250.0 / R_m;
+		var φ2 = Math.asin( Math.sin(φ1) * Math.cos(Δ_θ) + Math.cos(φ1) * Math.sin(Δ_θ) * Math.cos(α_rd) );
+		if (Math.abs(Math.cos(φ2)) < 0.001)
+			var λ2 = λ1;
+		else
+			var λ2 = ((λ1 - Math.asin( Math.sin(α_rd)* Math.sin(Δ_θ) / Math.cos(φ1) ) + Math.PI ) % (2*Math.PI) ) - Math.PI;
+		φ2 = φ2/Math.PI*180.0;
+		λ2 = λ2/Math.PI*180.0;
+			L.polyline(
+				[this.geoCalc.φλ0, [φ2, λ2]], {
+					color: '#f754e1',
+					weight: 2,
+					dashArray: '5, 8'
+				}
+			)	
+			.addTo(this.map);
+			this.layers.old_dir = true;
+		}
 	},
 	dragStart_φλ0 : function (e) {
 		console.log('grag start φλ0');
