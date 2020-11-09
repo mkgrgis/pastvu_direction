@@ -123,7 +123,7 @@ create: function (map) {
     	    .on('mouseout', function (e) {
 				this.map.addEventListener('mousemove', this.onMapMouseMove, this);
 		    }, this)
-			.addEventListener('click', this.onCentralMarkerClick, this)
+			.addEventListener('click', this.on_φλ0_Click, this)
 			.addTo(this.map);
 		if (this.point.dir){
 			var α = this.dir_α[this.point.dir];
@@ -186,6 +186,11 @@ create: function (map) {
 		this.drawGeoSelectionLayers();
 		this.map.addEventListener('mousemove', this.onMapMouseMove, this);
 	},
+	on_φλ0_Click : function (e) {
+		if (!this.φλ0)
+			return;
+		this.geoSelectionComplete();
+	},
 	draw_Layers_φλ1 : function() {
 		if (this.layers.φλ1){
 			this.map.removeLayer(this.layers.φλ1);
@@ -212,7 +217,7 @@ create: function (map) {
     	    .on('mouseout', function (e) {
 				this.map.addEventListener('mousemove', this.onMapMouseMove, this);
 		    }, this)
-			.addEventListener('click', this.geoSelectionComplete, this)
+			.addEventListener('click', this.on_φλ1_Click, this)
 			.bindTooltip(this.marker_φλ0_mode2_tooltip)
 			.addTo(this.map);
 		this.layers.line_φλ0_φλ1 = L.polyline(
@@ -237,6 +242,13 @@ create: function (map) {
 		this.set_φλ1([ll.lat, ll.lng], true);
 		this.drawGeoSelectionLayers();
 		this.map.addEventListener('mousemove', this.onMapMouseMove, this);
+	},
+	on_φλ1_Click : function (e) {
+		var ll = e.target.getLatLng();
+		this.set_φλ1([ll.lat, ll.lng], true);
+		if (!this.φλ1)
+			return;
+		this.geoSelectionComplete();
 	},
 	draw_Layers_β : function() {
 		if (this.layers.sector){
@@ -268,12 +280,14 @@ create: function (map) {
 		.addTo(this.map);
 	},
 	dragStart_β : function () {
+		this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
 		this.map.removeLayer(this.layers.sector);
 	},
 	dragEnd_β : function () {
 		var ll = e.target.getLatLng();
-		this.φλ1 = [ll.lat, ll.lng];
+		this.β = Math.abs(this.Δl_azimut(this.φλ0, ll).α - this.geoCalc.α) * 2.0;
 		this.draw_Layers_β();
+		this.map.addEventListener('mousemove', this.onMapMouseMove, this);
 	},
 	drawGeoSelectionLayers : function (){ // Full drawing function for the object of image geodesical data
 		this.draw_Layers_φλ0();
@@ -309,19 +323,14 @@ create: function (map) {
 			var β = Math.abs(this.Δl_azimut(this.φλ0, φλ).α - this.geoCalc.α) * 2.0;
 			this.set_β(β, false);
 		}
-	},
-	onCentralMarkerClick : function (e) {
-		if (!this.φλ0)
-			return;
-		this.geoSelectionComplete();
-	},
+	},	
 	geoSelectionComplete : function (){
 		this.map.removeEventListener('click', this.onMapGeoSelectionClick, this);		
 		this.layers.φλ0.removeEventListener('dragstart', this.dragStart_φλ0, this);
 		this.layers.φλ0.removeEventListener('dragend', this.dragEnd_φλ0, this);
 		this.layers.φλ0.removeEventListener('mouseover');
 		this.layers.φλ0.removeEventListener('mouseout');
-		this.layers.φλ0.removeEventListener('click', this.onCentralMarkerClick, this);
+		this.layers.φλ0.removeEventListener('click', this.on_φλ0_Click, this);
 		if (this.layers.φλ1){
 			this.layers.φλ1.removeEventListener('dragstart', this.dragStart_φλ1, this);
 			this.layers.φλ1.removeEventListener('dragend', this.dragEnd_φλ1, this);
