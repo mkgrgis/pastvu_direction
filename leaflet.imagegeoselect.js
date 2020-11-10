@@ -36,8 +36,9 @@ create: function (map) {
 		nw: 315.0,
 		aero: NaN
 	}
-	this.marker_φλ0_mode1_tooltip = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить направление вида';
-	this.marker_φλ0_mode2_tooltip = 'Это точка <b>точка объекта на вертикальной оси</b> изображения,</br> обозначаемая <b>φλ₁</b></br>Нажмите на значок для завершения, если</br> затруднительно определить угол обзора';
+	this.marker_φλ0_tooltip = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить направление вида';
+	this.marker_φλ0_tooltip2 = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить угол обзора';
+	this.marker_φλ1_tooltip = 'Это <b>точка объекта на вертикальной оси</b> изображения,</br> обозначаемая <b>φλ₁</b></br>Нажмите на значок для завершения, если</br> затруднительно определить угол обзора';
 
 	this.drawGeoSelectionLayers(); // Нарисовали то, для чего достаточно данных
 
@@ -118,12 +119,13 @@ create: function (map) {
 			.addEventListener('dragstart', this.dragStart_φλ0, this)
 			.addEventListener('dragend', this.dragEnd_φλ0, this)
 			.on('mouseover', function (e) {
-        		this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
-	        }, this)
-    	    .on('mouseout', function (e) {
+				this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
+			}, this)
+			.on('mouseout', function (e) {
 				this.map.addEventListener('mousemove', this.onMapMouseMove, this);
-		    }, this)
+			}, this)
 			.addEventListener('click', this.on_φλ0_Click, this)
+			.bindTooltip(this.β ? null : (!this.φλ1 ? this.marker_φλ0_tooltip : this.marker_φλ0_tooltip2))
 			.addTo(this.map);
 		if (this.point.dir){
 			var α = this.dir_α[this.point.dir];
@@ -140,7 +142,7 @@ create: function (map) {
 					color: '#f754e1',
 					opacity: 0.4,
 					weight: 1
-				})		
+				})
 			.addTo(this.map);
 		const R_m = 6371e3; // r ♁
 		function rad (x)
@@ -162,7 +164,7 @@ create: function (map) {
 					weight: 2,
 					dashArray: '5, 8'
 				}
-			)	
+			)
 			.addTo(this.map);
 			this.layers.old_dir = true;
 		}
@@ -212,13 +214,13 @@ create: function (map) {
 			.addEventListener('dragstart', this.dragStart_φλ1, this)
 			.addEventListener('dragend', this.dragEnd_φλ1, this)
 			.on('mouseover', function (e) {
-        		this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
-	        }, this)
-    	    .on('mouseout', function (e) {
+				this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
+			}, this)
+			.on('mouseout', function (e) {
 				this.map.addEventListener('mousemove', this.onMapMouseMove, this);
-		    }, this)
+			}, this)
 			.addEventListener('click', this.on_φλ1_Click, this)
-			.bindTooltip(this.marker_φλ0_mode2_tooltip)
+			.bindTooltip(this.marker_φλ1_tooltip)
 			.addTo(this.map);
 		this.layers.line_φλ0_φλ1 = L.polyline(
 			[this.geoCalc.φλ0, this.geoCalc.φλ1], {
@@ -307,11 +309,8 @@ create: function (map) {
 		}
 		if (!this.φλ0)
 			return;
-		if (this.β){
-			this.layers.φλ0.unbindTooltip();
+		if (this.β)
 			this.geoSelectionComplete();
-		} else
-			this.layers.φλ0.bindTooltip(!this.φλ1 ? this.marker_φλ0_mode1_tooltip : this.marker_φλ0_mode2_tooltip);
 	},
 	onMapMouseMove : function (e) {
 		if (!this.φλ0)
@@ -323,9 +322,9 @@ create: function (map) {
 			var β = Math.abs(this.Δl_azimut(this.φλ0, φλ).α - this.geoCalc.α) * 2.0;
 			this.set_β(β, false);
 		}
-	},	
+	},
 	geoSelectionComplete : function (){
-		this.map.removeEventListener('click', this.onMapGeoSelectionClick, this);		
+		this.map.removeEventListener('click', this.onMapGeoSelectionClick, this);
 		this.layers.φλ0.removeEventListener('dragstart', this.dragStart_φλ0, this);
 		this.layers.φλ0.removeEventListener('dragend', this.dragEnd_φλ0, this);
 		this.layers.φλ0.removeEventListener('mouseover');
@@ -338,9 +337,9 @@ create: function (map) {
 			this.layers.φλ1.removeEventListener('mouseout');
    			this.map.removeLayer(this.layers.φλ1);
 		}
-        if (!this.φλ1 && this.layers.line_φλ0_φλ1)
+		if (!this.φλ1 && this.layers.line_φλ0_φλ1)
 			this.map.removeLayer(this.layers.line_φλ0_φλ1);
-        if (!this.β && this.layers.sector)
+		if (!this.β && this.layers.sector)
 			this.map.removeLayer(this.layers.sector);
 		if (this.φλ0){
 			this.layers.φλ0.remove();
