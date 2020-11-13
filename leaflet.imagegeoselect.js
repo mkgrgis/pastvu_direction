@@ -382,12 +382,16 @@ create: function (map) {
 		delete this.viewDir.geoCalc.β;
 
 		// Nomalize for geoJSON
-		this.viewDir.type = 'LineString';
-		this.viewDir.coordinates = [ this.viewDir.φλ0, this.viewDir.φλ1 ];
-		this.viewDir.viewAngle = Math.floor(this.viewDir.β);
+		if (this.viewDir.φλ0 && this.viewDir.φλ1){
+			this.viewDir.type = 'LineString';
+			this.viewDir.coordinates = [ this.viewDir.φλ0, this.viewDir.φλ1 ];
+			this.viewDir.viewAngle = Math.floor(this.viewDir.β);
+		}
 
-		this.viewField = this.direction_layers.sector.toGeoJSON();
-		// L.extend(this.viewField.properties, sector_prop_additional_obj)
+		if (this.viewDir.φλ0 && this.viewDir.φλ1 && this.viewDir.β){
+			this.viewField = this.direction_layers.sector.toGeoJSON();
+			// L.extend(this.viewField.properties, sector_prop_additional_obj)
+		}
 		this.complete_test(); // УДАЛИТЬ , ЭТО КОНЕЦ АЛГОРИТМА
 	},
 	geo_α : function (α) { // Латинский индекс направления по значению азимутального угла
