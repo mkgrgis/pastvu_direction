@@ -63,130 +63,11 @@ create: function (map) {
 	this.marker_φλ0_tooltip2 = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить угол обзора';
 	this.marker_φλ1_tooltip = 'Это <b>точка объекта на вертикальной оси</b> изображения,</br> обозначаемая <b>φλ₁</b></br>Нажмите на значок для завершения, если</br> затруднительно определить угол обзора';
 
-	this.drawGeoSelectionLayers(); // Нарисовали то, для чего достаточно данных
+	this.addTooltipDelayed(); // Extended functional for tooltips for the main points
+	this.drawGeoSelectionLayers(); // By current state of object if loaded from DB
 
 	this.map.addEventListener('click', this.onMapGeoSelectionClick, this);
-	this.map.addEventListener('mousemove', this.onMapMouseMove, this);
-
-	// include delayed tooltips
- L.Layer.include({
-
-	  showDelay: 500,
-	  hideDelay: 1500,
-
-	  bindTooltipDelayed: function (content, options) {
-
-			if (content instanceof L.Tooltip) {
-				 L.setOptions(content, options);
-				 this._tooltip = content;
-				 content._source = this;
-			} else {
-				 if (!this._tooltip || options) {
-					  this._tooltip = new L.Tooltip(options, this);
-				 }
-				 this._tooltip.setContent(content);
-
-			}
-
-			this._initTooltipInteractionsDelayed();
-
-			if (this._tooltip.options.permanent && this._map && this._map.hasLayer(this)) {
-				 this.openTooltipWithDelay();
-			}
-
-			return this;
-	  },
-
-	  _openTooltipDelayed: function (e) {
-			var layer = e.layer || e.target;
-
-			if (!this._tooltip || !this._map) {
-				 return;
-			}
-			this.openTooltipWithDelay(layer, this._tooltip.options.sticky ? e.latlng : undefined);
-	  },
-
-	  openTooltipDelayed: function (layer, latlng) {
-			if (!(layer instanceof L.Layer)) {
-				 latlng = layer;
-				 layer = this;
-			}
-			if (layer instanceof L.FeatureGroup) {
-				 for (var id in this._layers) {
-					  layer = this._layers[id];
-					  break;
-				 }
-			}
-			if (!latlng) {
-				 latlng = layer.getCenter ? layer.getCenter() : layer.getLatLng();
-			}
-			if (this._tooltip && this._map) {
-				 this._tooltip._source = layer;
-				 this._tooltip.update();
-				 this._map.openTooltip(this._tooltip, latlng);
-				 if (this._tooltip.options.interactive && this._tooltip._container) {
-					  addClass(this._tooltip._container, 'leaflet-clickable');
-					  this.addInteractiveTarget(this._tooltip._container);
-				 }
-			}
-			if (typeof lastMouseEvent != 'undefined')
-				layer.fireEvent('mousemove', lastMouseEvent);
-
-			return this;
-	  },
-	  openTooltipWithDelay: function (t, i) {
-			this._delay(this.openTooltipDelayed, this, this.showDelay, t, i);
-	  },
-	  closeTooltipDelayed: function () {
-			if (this._tooltip) {
-				 this._tooltip._close();
-				 if (this._tooltip.options.interactive && this._tooltip._container) {
-					  removeClass(this._tooltip._container, 'leaflet-clickable');
-					  this.removeInteractiveTarget(this._tooltip._container);
-				 }
-			}
-			return this;
-	  },
-	  closeTooltipWithDelay: function () {
-			clearTimeout(this._timeout);
-			this._delay(this.closeTooltipDelayed, this, this.hideDelay);
-	  },
-	  _delay: function (func, scope, delay, t, i) {
-			var me = this;
-			if (this._timeout) {
-				 clearTimeout(this._timeout)
-			}
-			this._timeout = setTimeout(function () {
-				 func.call(scope, t, i);
-				 delete me._timeout
-			}, delay)
-	  },
-	  _initTooltipInteractionsDelayed: function (remove$$1) {
-			if (!remove$$1 && this._tooltipHandlersAdded) { return; }
-			var onOff = remove$$1 ? 'off' : 'on',
-				events = {
-					 remove: this.closeTooltipWithDelay,
-					 move: this._moveTooltip
-				};
-			if (!this._tooltip.options.permanent) {
-				 events.mouseover = this._openTooltipDelayed;
-				 events.mouseout = this.closeTooltipWithDelay;
-				 events.click = this.closeTooltipWithDelay;
-				 if (this._tooltip.options.sticky) {
-					  events.mousemove = this._moveTooltip;
-				 }
-				 if (L.touch) {
-					  events.click = this._openTooltipDelayed;
-				 }
-			} else {
-				 events.add = this._openTooltipDelayed;
-			}
-			this[onOff](events);
-			this._tooltipHandlersAdded = !remove$$1;
-	  }
- });
-
-
+	this.map.addEventListener('mousemove', this.onMapMouseMove, this);	
 	},
 	//// block of set functions for elements of image's geodesical data
 	set_φλ0 : function (φλ0, stable) { // photographer's / artist point
@@ -521,12 +402,12 @@ create: function (map) {
 		var Δλ = rad (φλ1[1]-φλ0[1]);
 
 		var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-			  Math.cos(φ1) * Math.cos(φ2) *
-			  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+			Math.cos(φ1) * Math.cos(φ2) *
+			Math.sin(Δλ/2) * Math.sin(Δλ/2);
 		var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 		var y = Math.sin(λ2-λ1) * Math.cos(φ2);
 		var x = Math.cos(φ1)*Math.sin(φ2) -
-			  Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+			Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
 		var θ = Math.atan2(y, x);
 
 		const R_m = 6371e3; // r ♁
@@ -534,6 +415,126 @@ create: function (map) {
 			Δl_m: R_m * c,
 			α:(θ*180/Math.PI + 360) % 360 // °
 		};
+	},
+	addTooltipDelayed: function () { // include delayed tooltips
+	L.Layer.include({
+
+		showDelay: 1000,
+		hideDelay: 100,
+
+		bindTooltipDelayed: function (content, options) {
+	
+				if (content instanceof L.Tooltip) {
+					 L.setOptions(content, options);
+					 this._tooltip = content;
+					 content._source = this;
+				} else {
+					 if (!this._tooltip || options) {
+						this._tooltip = new L.Tooltip(options, this);
+					 }
+					 this._tooltip.setContent(content);
+	
+				}
+	
+				this._initTooltipInteractionsDelayed();
+	
+				if (this._tooltip.options.permanent && this._map && this._map.hasLayer(this)) {
+					 this.openTooltipWithDelay();
+				}
+	
+				return this;
+		},
+	
+		_openTooltipDelayed: function (e) {
+				var layer = e.layer || e.target;
+	
+				if (!this._tooltip || !this._map) {
+					 return;
+				}
+				this.openTooltipWithDelay(layer, this._tooltip.options.sticky ? e.latlng : undefined);
+		},
+	
+		openTooltipDelayed: function (layer, latlng) {
+				if (!(layer instanceof L.Layer)) {
+					 latlng = layer;
+					 layer = this;
+				}
+				if (layer instanceof L.FeatureGroup) {
+					 for (var id in this._layers) {
+						layer = this._layers[id];
+						break;
+					 }
+				}
+				if (!latlng) {
+					 latlng = layer.getCenter ? layer.getCenter() : layer.getLatLng();
+				}
+				if (this._tooltip && this._map) {
+					 this._tooltip._source = layer;
+					 this._tooltip.update();
+					 this._map.openTooltip(this._tooltip, latlng);
+					 if (this._tooltip.options.interactive && this._tooltip._container) {
+						addClass(this._tooltip._container, 'leaflet-clickable');
+						this.addInteractiveTarget(this._tooltip._container);
+					 }
+				}
+				if (typeof lastMouseEvent != 'undefined')
+					layer.fireEvent('mousemove', lastMouseEvent);
+	
+				return this;
+		},
+		openTooltipWithDelay: function (t, i) {
+				this._delay(this.openTooltipDelayed, this, this.showDelay, t, i);
+		},
+		closeTooltipDelayed: function () {
+				if (this._tooltip) {
+					 this._tooltip._close();
+					 if (this._tooltip.options.interactive && this._tooltip._container) {
+						removeClass(this._tooltip._container, 'leaflet-clickable');
+						this.removeInteractiveTarget(this._tooltip._container);
+					 }
+				}
+				return this;
+		},
+		closeTooltipWithDelay: function () {
+				clearTimeout(this._timeout);
+				this._delay(this.closeTooltipDelayed, this, this.hideDelay);
+		},
+		_delay: function (func, scope, delay, t, i) {
+				var me = this;
+				if (this._timeout) {
+					 clearTimeout(this._timeout)
+				}
+				this._timeout = setTimeout(function () {
+					 func.call(scope, t, i);
+					 delete me._timeout
+				}, delay)
+		},
+		_initTooltipInteractionsDelayed: function (remove$$1) {
+				if (!remove$$1 && this._tooltipHandlersAdded) { return; }
+				var onOff = remove$$1 ? 'off' : 'on',
+					events = {
+						 remove: this.closeTooltipWithDelay,
+						 move: this._moveTooltip
+					};
+				if (!this._tooltip.options.permanent) {
+					 events.mouseover = this._openTooltipDelayed;
+					 events.mouseout = this.closeTooltipWithDelay;
+					 events.click = this.closeTooltipWithDelay;
+					 if (this._tooltip.options.sticky) {
+						events.mousemove = this._moveTooltip;
+					 }
+					 if (L.touch) {
+						events.click = this._openTooltipDelayed;
+					 }
+				} else {
+					 events.add = this._openTooltipDelayed;
+				}
+				this[onOff](events);
+				this._tooltipHandlersAdded = !remove$$1;
+		}
+	});
 	}
+
+// end of code block
 };
 
