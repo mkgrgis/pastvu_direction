@@ -23,7 +23,7 @@ create: function (map) {
 	this.map = map;
 	this.p = {};
 	this.point = {};
-	this.point.dir = 's';
+	this.point.dir = 'n';
 // НАЧАЛО ФРАГМЕНТА ДЛЯ ВСТРАИВАНИЯ
 
 
@@ -62,12 +62,17 @@ create: function (map) {
 	this.marker_φλ0_tooltip = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить направление вида';
 	this.marker_φλ0_tooltip2 = 'Это <b>точка съёмки</b>,</br> обозначаемая <b>φλ₀</b></br>Нажмите на значок для завершения, если</br>затруднительно определить угол обзора';
 	this.marker_φλ1_tooltip = 'Это <b>точка объекта на вертикальной оси</b> изображения,</br> обозначаемая <b>φλ₁</b></br>Нажмите на значок для завершения, если</br> затруднительно определить угол обзора';
+	this.marker_β_tooltip = 'Эта <b>точка условный ограничитель угла обзора</b> изображения,</br> обозначаемого <b>β</b></br>Нажмите на значок для подтверждения выбора';
 
 	this.addTooltipDelayed(); // Extended functional for tooltips for the main points
 	this.drawGeoSelectionLayers(); // By current state of object if loaded from DB
 
 	this.map.addEventListener('click', this.onMapGeoSelectionClick, this);
 	this.map.addEventListener('mousemove', this.onMapMouseMove, this);	
+	},
+	get_e_φλ: function (e){ // get coordinates of event
+		var ll = e.target.getLatLng();
+		return [ll.lat, ll.lng];	
 	},
 	//// block of set functions for elements of image's geodesical data
 	set_φλ0 : function (φλ0, stable) { // photographer's / artist point
@@ -104,7 +109,7 @@ create: function (map) {
 			this.drawGeoSelectionLayers();
 		}
 	},
-	set_β : function(β, stable) { // °, measure of observation
+	set_β : function(β, stable, φλ) { // °, measure of observation
 		if (!β){
 			this.viewDir.β = null;
 			this.viewDir.geoCalc.β = null;
@@ -120,6 +125,8 @@ create: function (map) {
 			this.viewDir.geoCalc.α2 = (this.viewDir.geoCalc.α + Δβ);
 			this.drawGeoSelectionLayers();
 		}
+		if (φλ)
+			this.viewDir.geoCalc.φλ_ = φλ;
 	},
 	//// block for layers of elements of selection image's geodesical data
 	draw_Layers_φλ0 : function() {
@@ -127,6 +134,8 @@ create: function (map) {
 			this.map.removeLayer(this.direction_layers.φλ0);
 		if (this.direction_layers.sector)
 			this.map.removeLayer(this.direction_layers.sector);
+		if (this.direction_layers.β_marker)
+			this.map.removeLayer(this.direction_layers.β_marker);
 		if (!this.viewDir.geoCalc.φλ0)
 			return;
 		this.direction_layers.φλ0 = L.marker(
@@ -151,7 +160,7 @@ create: function (map) {
 			.addEventListener('click', this.on_φλ0_Click, this)
 			.bindTooltipDelayed(this.viewDir.β ? null : (!this.viewDir.φλ1 ? this.marker_φλ0_tooltip : this.marker_φλ0_tooltip2))
 			.addTo(this.map);
-		if (this.point.dir){
+		if (this.point.dir){ // direction in old format -> unmoved pink sector
 			var α = this.dir_α[this.point.dir];
 			if (!α.isNaN && !this.direction_layers.old_dir)
 				L.sector({
@@ -168,22 +177,8 @@ create: function (map) {
 					weight: 1
 				})
 			.addTo(this.map);
-		const R_m = 6371e3; // r ♁
-		function rad (x)
-			{ return x * Math.PI/180; }
-		var φ1 = rad (this.viewDir.φλ0[0]);
-		var λ1 = rad (this.viewDir.φλ0[1]);
-		var α_rd = rad (α);
-		var Δ_θ = 250.0 / R_m;
-		var φ2 = Math.asin( Math.sin(φ1) * Math.cos(Δ_θ) + Math.cos(φ1) * Math.sin(Δ_θ) * Math.cos(α_rd) );
-		if (Math.abs(Math.cos(φ2)) < 0.001)
-			var λ2 = λ1;
-		else
-			var λ2 = ((λ1 - Math.asin( Math.sin(α_rd)* Math.sin(Δ_θ) / Math.cos(φ1) ) + Math.PI ) % (2*Math.PI) ) - Math.PI;
-		φ2 = φ2/Math.PI*180.0;
-		λ2 = λ2/Math.PI*180.0;
 			L.polyline(
-				[this.viewDir.geoCalc.φλ0, [φ2, λ2]], {
+				[this.viewDir.geoCalc.φλ0, this.φλ_azimut(this.viewDir.geoCalc.φλ0, 250.0, α)], {
 					color: '#f754e1',
 					weight: 2,
 					dashArray: '5, 8'
@@ -198,16 +193,17 @@ create: function (map) {
 		this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
 		if (this.direction_layers.sector)
 			this.map.removeLayer(this.direction_layers.sector);
+		if (this.direction_layers.β_marker)
+			this.map.removeLayer(this.direction_layers.β_marker);
 		if (this.direction_layers.line_φλ0_φλ1)
 			this.map.removeLayer(this.direction_layers.line_φλ0_φλ1);
-		//if (this.direction_layers.φλ1)			this.map.removeLayer(this.direction_layers.φλ1);
 	},
 	dragEnd_φλ0 : function (e) {
 		console.log('grag end φλ0');
-		var ll = e.target.getLatLng();
-		this.set_φλ0([ll.lat, ll.lng], true);
+		var φλ0 = this.get_e_φλ(e);
+		this.set_φλ0(φλ0, true);
 		this.set_φλ1(this.viewDir.φλ1, true);
-		this.set_β(this.viewDir.β, true);
+		this.set_β(this.viewDir.β, true, φλ0);
 		this.map.removeLayer(this.direction_layers.φλ0);
 		this.drawGeoSelectionLayers();
 		this.map.addEventListener('mousemove', this.onMapMouseMove, this);
@@ -264,22 +260,22 @@ create: function (map) {
 	},
 	dragEnd_φλ1 : function (e) {
 		console.log('grag end φλ1');
-		var ll = e.target.getLatLng();
-		this.set_φλ1([ll.lat, ll.lng], true);
+		this.set_φλ1(this.get_e_φλ(e), true);
 		this.drawGeoSelectionLayers();
 		this.map.addEventListener('mousemove', this.onMapMouseMove, this);
 	},
-	on_φλ1_Click : function (e) {
-		var ll = e.target.getLatLng();
-		this.set_φλ1([ll.lat, ll.lng], true);
+	on_φλ1_Click : function (e) {		
+		this.set_φλ1(this.get_e_φλ(e), true);
 		if (!this.viewDir.φλ1)
 			return;
 		this.geoSelectionComplete();
 	},
-	draw_Layers_β : function() {
+	draw_Layers_β : function(no_marker) {
 		if (this.direction_layers.sector){
 			this.map.removeLayer(this.direction_layers.sector);
 		}
+		if (this.direction_layers.β_marker)
+			this.map.removeLayer(this.direction_layers.β_marker);
 		if (!this.viewDir.φλ0 || !this.viewDir.geoCalc.α || !this.viewDir.geoCalc.β)
 			return;
 		var Δβ = this.viewDir.geoCalc.β / 2.0;
@@ -296,7 +292,7 @@ create: function (map) {
 			startBearing: this.viewDir.geoCalc.α1,
 			endBearing :this.viewDir.geoCalc.α2,
 			fill: true,
-			fillColor:'#aa0000',
+			fillColor: this.viewDir.φλ1 ? '#aa0000' : '#000000',
 			fillOpacity: 0.3,
 			color: '#ff0000',
 			opacity: 0.1,
@@ -304,16 +300,44 @@ create: function (map) {
 		})
 		.addEventListener('dragend', this.dragEnd_β, this)
 		.addTo(this.map);
+		if (!this.viewDir.φλ1 || !this.viewDir.geoCalc.φλ_ || no_marker)
+			return;
+		var α_ = Math.abs(this.Δl_azimut(this.viewDir.φλ0, this.viewDir.geoCalc.φλ_).α);
+		var φλ_β_marker = this.φλ_azimut(this.viewDir.φλ0, this.viewDir.geoCalc.Δl_m, -α_);
+		this.direction_layers.β_marker = L.marker(
+			φλ_β_marker, {
+				draggable: true, // title: this.title,
+				icon: L.icon.glyph({
+					prefix: '',
+					cssClass:'sans-serif',
+					glyph: 'β'
+				})
+			})
+			.addEventListener('dragstart', this.dragStart_β, this)
+			.addEventListener('dragend', this.dragEnd_β, this)
+			.addEventListener('mouseover', function (e) {
+				this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
+			}, this)
+			.addEventListener('mouseout', function (e) {
+				this.map.addEventListener('mousemove', this.onMapMouseMove, this);
+			}, this)
+			.addEventListener('click', this.on_β_marker_Click, this)
+			.bindTooltipDelayed(this.marker_β_tooltip)
+			.addTo(this.map);
 	},
-	dragStart_β : function () {
+	dragStart_β : function (e) {
 		this.map.removeEventListener('mousemove', this.onMapMouseMove, this);
 		this.map.removeLayer(this.direction_layers.sector);
 	},
-	dragEnd_β : function () {
-		var ll = e.target.getLatLng();
-		this.viewDir.β = Math.abs(this.Δl_azimut(this.viewDir.φλ0, ll).α - this.viewDir.geoCalc.α) * 2.0;
+	dragEnd_β : function (e) {
+		var β = Math.abs(this.Δl_azimut(this.viewDir.φλ0, this.get_e_φλ(e)).α - this.viewDir.geoCalc.α) * 2.0;
+
+		this.set_β (β, true, this.get_e_φλ(e));
 		this.draw_Layers_β();
 		this.map.addEventListener('mousemove', this.onMapMouseMove, this);
+	},
+	on_β_marker_Click : function (e) {		
+		this.geoSelectionComplete();
 	},
 	drawGeoSelectionLayers : function (){ // Full drawing function for the object of image geodesical data
 		this.draw_Layers_φλ0();
@@ -329,7 +353,7 @@ create: function (map) {
 			this.set_φλ1(φλ, true);
 		} else {
 			var β = Math.abs(this.Δl_azimut(this.viewDir.φλ0, φλ).α - this.viewDir.geoCalc.α) * 2.0;
-			this.set_β(β, true);
+			this.set_β(β, true, φλ);
 		}
 		if (!this.viewDir.φλ0)
 			return;
@@ -344,7 +368,7 @@ create: function (map) {
 			this.set_φλ1(φλ, false);
 		else {
 			var β = Math.abs(this.Δl_azimut(this.viewDir.φλ0, φλ).α - this.viewDir.geoCalc.α) * 2.0;
-			this.set_β(β, false);
+			this.set_β(β, false, φλ);
 		}
 	},
 	geoSelectionComplete : function (){
@@ -366,6 +390,8 @@ create: function (map) {
 			this.map.removeLayer(this.direction_layers.line_φλ0_φλ1);
 		if (!this.viewDir.β && this.direction_layers.sector)
 			this.map.removeLayer(this.direction_layers.sector);
+		if (!this.viewDir.β && this.direction_layers.β_marker)
+			this.map.removeLayer(this.direction_layers.β_marker);
 		if (this.viewDir.φλ0){
 			this.direction_layers.φλ0.remove();
 			this.direction_layers.φλ0.options.draggable = false;
@@ -376,15 +402,19 @@ create: function (map) {
 			this.viewDir.geoCalc.Δl_m = null;
 			this.viewDir.geoCalc.α = null;
 		}
-		this.draw_Layers_β();
+		this.draw_Layers_β(true);
+
 		delete this.viewDir.geoCalc.φλ0;
 		delete this.viewDir.geoCalc.φλ1;
 		delete this.viewDir.geoCalc.β;
 
 		// Nomalize for geoJSON
-		if (this.viewDir.φλ0 && this.viewDir.φλ1){
+		if (this.viewDir.φλ0){
 			this.viewDir.type = 'LineString';
-			this.viewDir.coordinates = [ this.viewDir.φλ0, this.viewDir.φλ1 ];
+			if (this.viewDir.φλ1)
+				this.viewDir.coordinates = [ this.viewDir.φλ0, this.viewDir.φλ1 ];
+			else
+				this.viewDir.coordinates = [ this.viewDir.φλ0 ];
 			this.viewDir.viewAngle = Math.floor(this.viewDir.β);
 		}
 
@@ -394,12 +424,12 @@ create: function (map) {
 		}
 		this.complete_test(); // УДАЛИТЬ , ЭТО КОНЕЦ АЛГОРИТМА
 	},
-	geo_α : function (α) { // Латинский индекс направления по значению азимутального угла
+	geo_α : function (α) { // Latin letter for α
 		return α ? this.dir[Math.floor(α/11.25)] : null;
 	},
-	Δl_azimut : function (φλ0, φλ1) { // Функция определения азимута линии из точки 0 в точку 1 и примерного расстояния
+	Δl_azimut : function (φλ0, φλ1) { // From φλ0 to φλ1. Calculating azimuth α(φλ0,φλ1) and metrical Δl(φλ0,φλ1)
 		function rad (x)
-			{ return x * Math.PI/180; }
+			{ return x * Math.PI/180.0; }
 		var φ1 = rad (φλ0[0]); var λ1 = rad (φλ0[1]);
 		var φ2 = rad (φλ1[0]); var λ2 = rad (φλ1[1]);
 		var Δφ = rad (φλ1[0]-φλ0[0]);
@@ -419,6 +449,23 @@ create: function (map) {
 			Δl_m: R_m * c,
 			α:(θ*180/Math.PI + 360) % 360 // °
 		};
+	},
+	φλ_azimut : function (φλ0, Δl_m, α) { // From φλ0, Δl_m and α to φλ1. Calculating point by metrical distance and azimuth
+		function rad (x)
+			{ return x * Math.PI/180.0; }
+		const R_m = 6371e3; // r ♁
+		var φ0 = rad (φλ0[0]);
+		var λ0 = rad (φλ0[1]);
+		var α_rd = rad (α);
+		var Δθ = Δl_m / R_m;
+		var φ1 = Math.asin( Math.sin(φ0) * Math.cos(Δθ) + Math.cos(φ0) * Math.sin(Δθ) * Math.cos(α_rd) );
+		if (Math.abs(Math.cos(φ1)) < 0.001)
+			var λ1 = λ0;
+		else
+			var λ1 = ((λ0 - Math.asin( Math.sin(α_rd)* Math.sin(Δθ) / Math.cos(φ0) ) + Math.PI ) % (2*Math.PI) ) - Math.PI;
+		φ1 = φ1/Math.PI*180.0;
+		λ1 = λ1/Math.PI*180.0;
+		return [φ1, λ1];
 	},
 	addTooltipDelayed: function () { // include delayed tooltips
 	L.Layer.include({
